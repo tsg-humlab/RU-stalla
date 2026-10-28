@@ -409,20 +409,20 @@ def nlogin(request):
     context['is_app_uploader'] = user_is_ingroup(request, app_uploader)
     return render(request,'nlogin.html', context)
 
-@csrf_exempt
-def image_upload_handler(request):
-    oErr = ErrHandle()
-    data = {'status': 'starting'}
-    try:
-        if request.method == 'POST':
-            file = request.FILES['file']
-        x = 1
-    except:
-        oErr.DoError("upload_image error")
-        data['status'] = "error"
+# @csrf_exempt
+# def image_upload_handler(request):
+#     oErr = ErrHandle()
+#     data = {'status': 'starting'}
+#     try:
+#         if request.method == 'POST':
+#             file = request.FILES['file']
+#         x = 1
+#     except:
+#         oErr.DoError("upload_image error")
+#         data['status'] = "error"
 
-    # Return this response
-    return JsonResponse(data)
+#     # Return this response
+#     return JsonResponse(data)
 
 # ================ OTHER VIEW HELP FUNCTIONS ============================
 
@@ -536,41 +536,43 @@ def sync_progress(request):
     data = {'status': 'preparing'}
 
     try:
-        # Get the user
-        username = request.user.username
-        # Get the synchronization type
-        get = request.GET
-        synctype = ""
-        if 'synctype' in get:
-            synctype = get['synctype']
-
-        if synctype == '':
-            # Formulate a response
-            data['status'] = 'error'
-            data['msg'] = "no sync type specified" 
-
+        # Authentication
+        if not user_is_ingroup(request, app_editor):
+            data['status'] = "no access"
         else:
-            # Formulate a response
-            data['status'] = 'UNKNOWN'
+            # Get the user
+            username = request.user.username
+            # Get the synchronization type
+            get = request.GET
+            synctype = ""
+            if 'synctype' in get:
+                synctype = get['synctype']
 
-            # Get the appropriate status object
-            # sleep(1)
-            oStatus = Status.objects.filter(user=username, type=synctype).first()
-
-            # Check what we received
-            if oStatus == None:
-                # There is no status object for this type
+            if synctype == '':
+                # Formulate a response
                 data['status'] = 'error'
-                data['msg'] = "Cannot find status for {}/{}".format(
-                    username, synctype)
-            else:
-                # Get the last status information
-                data['status'] = oStatus.status
-                data['msg'] = oStatus.msg
-                data['count'] = oStatus.count
+                data['msg'] = "no sync type specified" 
 
-        # Return this response
-        return JsonResponse(data)
+            else:
+                # Formulate a response
+                data['status'] = 'UNKNOWN'
+
+                # Get the appropriate status object
+                # sleep(1)
+                oStatus = Status.objects.filter(user=username, type=synctype).first()
+
+                # Check what we received
+                if oStatus == None:
+                    # There is no status object for this type
+                    data['status'] = 'error'
+                    data['msg'] = "Cannot find status for {}/{}".format(
+                        username, synctype)
+                else:
+                    # Get the last status information
+                    data['status'] = oStatus.status
+                    data['msg'] = oStatus.msg
+                    data['count'] = oStatus.count
+
     except:
         oErr.DoError("sync_start error")
         data = {'status': 'error'}
@@ -584,28 +586,32 @@ def mdb_upload(request):
     oErr = ErrHandle()
     data = {'status': 'starting'}
     try:
-        # Get the user
-        username = request.user.username
-        if username:
-            # Reset 'mdbuploaded' and 'mdbuser'
-            Information.set_kvalue("mdbuploaded", "")
-            Information.set_kvalue("mdbuser", "")
-            # Try to handle...
-            if request.method == 'POST':
-                file = request.FILES['file']
-                # Save the file to the writable directory
-                filepath = os.path.join(MEDIA_DIR, "stalla", file.name)
-                with open(filepath, 'wb+') as destination:
-                    for chunk in file.chunks():
-                        destination.write(chunk)
-                data['status'] = 'done'
-                # Write the name of this uploaded file
-                Information.set_kvalue("mdbuploaded", file.name)
-                Information.set_kvalue("mdbuser", username)
-            else:
-                data['status'] = 'no POST received'
+        # Authentication
+        if not user_is_ingroup(request, app_editor):
+            data['status'] = "no access"
         else:
-            data['status'] = "None-user upload attempt"
+            # Get the user
+            username = request.user.username
+            if username:
+                # Reset 'mdbuploaded' and 'mdbuser'
+                Information.set_kvalue("mdbuploaded", "")
+                Information.set_kvalue("mdbuser", "")
+                # Try to handle...
+                if request.method == 'POST':
+                    file = request.FILES['file']
+                    # Save the file to the writable directory
+                    filepath = os.path.join(MEDIA_DIR, "stalla", file.name)
+                    with open(filepath, 'wb+') as destination:
+                        for chunk in file.chunks():
+                            destination.write(chunk)
+                    data['status'] = 'done'
+                    # Write the name of this uploaded file
+                    Information.set_kvalue("mdbuploaded", file.name)
+                    Information.set_kvalue("mdbuser", username)
+                else:
+                    data['status'] = 'no POST received'
+            else:
+                data['status'] = "None-user upload attempt"
     except:
         oErr.DoError("upload_mdb error")
         data['status'] = "error"
